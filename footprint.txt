@@ -1,0 +1,6 @@
+STAC Chat: Building better footprints with stactools
+Improving STAC Item geometries with stactools
+
+Working with the stactools raster footprint utility
+
+Raster data and STAC: Using the `stactools` raster footprint utility to improve STAC Item geometries
