@@ -1,0 +1,5 @@
+notebook
+rasterio
+matplotlib
+geopandas
+stactools

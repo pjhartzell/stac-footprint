@@ -43,7 +43,7 @@ The first step is to create a 2D mask array of valid data pixel locations in the
 Two options apply to the mask creation step:
 
 1. `no_data`: Pixel value to exclude from the raster footprint. Defaults to `None`, in which case a footprint for the entire raster grid is calculated.
-2. `bands`: Band indices to include in the raster footprint calculation. This option is only available in the alternative constructors, where it is used to generate the `data_array` argument.
+2. `bands`: List of band indices to include in the raster footprint calculation. Defaults to `[1]`, in which case only the first band is used. *This option is only available in the alternative constructors, where it is used to generate the `data_array` argument.*
 
 ```python
 footprint = RasterFootprint(data_array, crs, transform, no_data=0).footprint()
@@ -63,36 +63,15 @@ convex hull
 
 ## Implementation
 
-## Final thoughts
+## Closing thoughts
 
 Let's address what may be the most obvious approach right out of the gate: reproject the raster to WGS84, extract a footprint outlining the data, and apply some type of simplification to the footprint. This is, indeed, a valid approach and readily accomplished with the rasterio and shapely libraries. It is not, however, the stactools approach, for a few reasons. First, raster reprojection is computationally expensive. Second, in keeping with the desire for simple footprints, the stactools approach uses a convex hull to produce a single polygon footprint in instances where shape extraction produces multiple polygons (think of a coastline with many islands). Referring back to the MODIS example image, we can see that a convex hull applied in the WGS84 CRS will result in a gap on the east side, which is something we are deliberately trying to avoid. So the stactools utility takes a different approach:
 Note this allows us to model concavities induced by reprojection. This is important, as concavity is not near as simple as convexity....
 
-spatial extent with geographic coordinates in decimal degrees in the WGS84 coordinate reference system.
-
-When creating an Item that describes a raster image, a spatial footprint of the image data must be generated to use for the Item geometry field. We intentionally use the imprecise term "footprint" here, as we are not trying to create a precise vector representation of the data of an image (which could contain as many polygons as pixels in the image!), but we are trying to do better than just a bounding box of the entire image, both data and no data. By footprint, we mean a vector that balances many competing factors, and generally represents a shape covering the data in an image. Figuring out the right parameter values to the methods in the raster_footprint module will usually require some experimental validation, to find exactly the right values for your data, CRS, and use cases.
-
-There are a few properties we’d like to have in a footprint:
-
-The footprint only covers the area on the image only where there is data.
-
-The footprint has enough points to accurately capture the shape of the data in the EPSG:4326 CRS used by GeoJSON.
-
-The footprint does not have too many points, such that it is becomes very large.
-
-Discussion of these properties follows.
-
-## Challenges
-
-1. raster data is usually projected, that is, not in the WGS84 CRS required by the GeoJSON specification.
-2. raster data may include areas (regions of pixels) that contain no data, that is, pixels with a value specified as "nodata" in the image metadata. In some cases we would like to exclude these nodata areas from our Item geometry.
-
-Along the way, we'll discuss methods for balancing the need for accurately capturing the shape of the data while constraining the number of points in bounding polygon
-
-## Caveat
-
-We are not handling concavity. If we were, an alternative approach would be to reproject the data to WGS84 before extracting the shapes.
-
-## Final Thoughts
-
 An alternative approach is to reproject the data first and then define the boundaries. This would eliminate the densification tuning. This is a valid approach and was investigated when building the raster footprint utility. Ultimately, the goal of limiting complexity by using a convex hull steered us away from that approach. Referring to the MODIS example in this post, a convex hull in the WGS84 will consistently produce gaps...
+
+Improvements:
+
+- spatial extent with geographic coordinates in decimal degrees in the WGS84 coordinate reference system.
+- Unable to force nodata=None to produce raster grid footprint via alternative constructors
+- We can OR bands, but not Assets
