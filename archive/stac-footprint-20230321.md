@@ -20,15 +20,9 @@ Finally, we want to balance footprint accuracy versus complexity (size). Perfect
 
 ## Approach
 
-The basic approach taken by the stactools raster footprint utility is to create a densified polygon around the valid data in the raster's native CRS, project the densified polygon to WGS84, and then simplify the densified, projected polygon. Densifying the polygon refers to inserting new vertices between existing ones. This is done prior to projection to better capture projection distortion, which causes straight lines to become curved. Once projected, however, there may be more vertices than necessary to maintain a desired accuracy. This is handled by applying a simplification process that removes as many polygon vertices as possible while maintaining a maximum allowable error tolerance between the initial and simplified polygons. We'll work through these concepts with visuals later in this post.
+The `stactools` approach is contained in the `RasterFootprint` class. Calling the `footprint()` method on a class instance kicks off a five-step process:
 
-In terms of implementation, the stactools raster footprint utility is realized in the `RasterFootprint` class. For a given raster product, the minimal signature to create a class instance requires a `numpy` array of the raster data, the raster's native CRS, and the raster transform matrix:
-
-```python
-my_footprint_class = RasterFootprint(data_array, crs, transform)
-```
-
-Calling the `footprint()` method on a `RasterFootprint` instance kicks off a five-step process:
+`stactools` takes a five-step approach to raster footprint creation:
 
 1. Create a mask of valid data pixels from the raster data.
 2. Extract the footprint of the valid data in the raster's native CRS.
@@ -36,28 +30,30 @@ Calling the `footprint()` method on a `RasterFootprint` instance kicks off a fiv
 4. Project the densified footprint to the WGS84 CRS.
 5. Simplify the projected WGS84 footprint.
 
-In practice, users are more likely to employ one of the `RasterFootprint` alternative constructors to create a class instance from a file path or STAC Item, bypassing the need to manually provide the raster data array, CRS, and transform. These constructors are reviewed in the "Implementation" section toward the end of this blog post. For now, let's work through the core five step process and the options that are available to tune the footprint characteristics. We'll use the same MODIS tile as above as an example and produce images to illustrate the effect of certain options.
+These five steps are executed by the `footprint()` method of the `RasterFootprint` class. The minimal signature to create a raster footprint requires a `numpy` array of raster data, the native raster CRS, and the raster transform matrix:
+
+```python
+footprint = RasterFootprint(data_array, crs, transform).footprint()
+```
+
+In practice, users are more likely to employ one of the `RasterFootprint` alternative constructors to create a class instance from a file path or STAC Item, bypassing the need to manually provide the raster data array, CRS, and transform. These constructors are reviewed in the "Implementation" section toward the end of this blog post. For now, let's work through the five step approach and the options that are available to tune the footprint characteristics. We'll use the same MODIS tile as above as our example and produce images for each option to illustrate the impact.
 
 ### 1. Mask
 
-The first step creates a 2D mask array of valid data pixel locations in the given `data_array`. All "nodata" pixel locations are set to 0 and valid data pixels are set to 1. If the raster data is multi-band, meaning the given `data_array` and initial mask array are 3D, the initial mask array is flattened to 2D along the band axis. The existence of valid data in any band will cause the 2D mask array at that pixel location to be set to 1, i.e., the mask is flattened using `OR` logic. For a pixel in the 2D mask array to be set to 0, the corresponding pixel in each band must contain the "nodata" value.
+The first step creates a 2D mask array of valid data pixel locations in the given `data_array`: "nodata" value pixels are set to 0 and valid data pixels are set to 1. If the raster data is multi-band, meaning the given `data_array` and initial mask array are 3D, the initial mask array is flattened to 2D along the band axis. The existence of valid data in any band will cause the 2D mask array at that pixel location to be set to 1, i.e., the mask is flattened using `OR` logic. For a pixel in the 2D mask array to be set to 0, the corresponding pixel in each band must contain the "nodata" value.
 
 Two options apply to the mask creation step:
 
 1. `no_data`: Pixel value to exclude from the raster footprint. Defaults to `None`, in which case a footprint for the entire raster grid is calculated.
-2. `bands`: List of band indices to include in the raster footprint calculation. Defaults to `[1]`, in which case only the first band is used. Currently, this option is only available in the alternative constructors, where it is used to generate the `data_array` argument.
+2. `bands`: List of band indices to include in the raster footprint calculation. Defaults to `[1]`, in which case only the first band is used. *This option is only available in the alternative constructors, where it is used to generate the `data_array` argument.*
 
 ```python
 footprint = RasterFootprint(data_array, crs, transform, no_data=0).footprint()
 ```
 
-- images illustrating no_data=None versus nodata=0
-
-*Note: implementation of the `bands` option should be moved from the alternative constructor to the class initializer*
-
 ### 2. Shape extraction
 
-Now that we have a 2D mask array of 0s ("nodata" pixels) and 1s (valid data pixels), polygons surrounding regions of valid data are extracted via a call to rasterio's `features.shapes` function. For raster scenes with many isolated regions of valid data, this can result in a large set of polygons. To prevent complex, multi-polygon footprints f
+Shape extraction uses rasterio's `features.shapes` function
 
 convex hull
 
@@ -84,6 +80,3 @@ Improvements:
 - We should make convex hull an option (default=True)
   - allow full fidelity shape extraction
   - fill holes also an option (default=True)
-- there needs to be a way to pass a "None" value for nodata so that you can force a complete tile polygon
-- the bands option should be applied in the core footprint() method, not the alternative constructor. You shouldn't be forced to use the alternative constructor to use this option.
-- update_geometry_from_asset_footprint should also update the bbox
