@@ -1,5 +1,6 @@
-notebook
-rasterio
+contextily
 matplotlib
-geopandas
+notebook
+numpy
+rasterio
 stactools
